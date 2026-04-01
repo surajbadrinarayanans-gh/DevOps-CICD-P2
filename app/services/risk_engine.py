@@ -10,6 +10,3 @@ def calculate_risk(transaction):
         score += 20
 
     return min(score, 100)
-  
-  
-  

@@ -7,12 +7,14 @@ from app.db.session import SessionLocal
 
 router = APIRouter()
 
+
 def get_db():
     db = SessionLocal()
     try:
         yield db
     finally:
         db.close()
+
 
 @router.post("/transaction")
 def create_transaction(transaction: TransactionCreate, db: Session = Depends(get_db)):
@@ -23,7 +25,7 @@ def create_transaction(transaction: TransactionCreate, db: Session = Depends(get
         amount=transaction.amount,
         location=transaction.location,
         device_id=transaction.device_id,
-        risk_score=risk
+        risk_score=risk,
     )
 
     db.add(db_txn)
