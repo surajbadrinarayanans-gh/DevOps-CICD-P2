@@ -9,4 +9,4 @@ __pycache__/
 terraform/.terraform
 terraform/terraform.tfstate*
 terraform/txn-key.pem
-ansible/inventory.tftpl
+ansible/inventory.ini

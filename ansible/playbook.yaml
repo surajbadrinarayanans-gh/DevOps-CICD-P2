@@ -1,0 +1,113 @@
+- name: Setup App Server
+  hosts: app
+  become: yes
+
+  tasks:
+
+    - name: Update apt
+      apt:
+        update_cache: yes
+
+    - name: Install base dependencies
+      apt:
+        name:
+          - docker.io
+          - unzip
+          - curl
+        state: present
+
+    - name: Start Docker
+      service:
+        name: docker
+        state: started
+        enabled: true
+
+    - name: Add ubuntu user to docker group
+      user:
+        name: ubuntu
+        groups: docker
+        append: yes
+
+
+    - name: Download AWS CLI v2
+      get_url:
+        url: https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip
+        dest: /home/ubuntu/awscliv2.zip
+
+    - name: Unzip AWS CLI
+      unarchive:
+        src: /home/ubuntu/awscliv2.zip
+        dest: /home/ubuntu/
+        remote_src: yes
+
+    - name: Install or Update AWS CLI
+      command: ./aws/install --update
+      args:
+        chdir: /home/ubuntu/
+      ignore_errors: yes
+
+
+    - name: Create Docker network
+      docker_network:
+        name: app-network
+
+
+    - name: Remove old app container
+      docker_container:
+        name: transaction-app
+        state: absent
+        force_kill: true
+
+    - name: Remove old postgres container
+      docker_container:
+        name: postgres-db
+        state: absent
+        force_kill: true
+
+
+    - name: Run Postgres container
+      docker_container:
+        name: postgres-db
+        image: postgres:latest
+        state: started
+        restart_policy: always
+        networks:
+          - name: app-network
+        env:
+          POSTGRES_USER: user
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: transactions
+        ports:
+          - "5432:5432"
+
+
+    - name: Wait for Postgres to start
+      pause:
+        seconds: 10
+
+
+    - name: Login to ECR
+      shell: |
+        aws ecr get-login-password --region {{ aws_region }} \
+        | docker login --username AWS --password-stdin {{ ecr_repo }}
+
+
+    - name: Pull app image
+      docker_image:
+        name: "{{ ecr_repo }}"
+        tag: latest
+        source: pull
+
+
+    - name: Run App container
+      docker_container:
+        name: transaction-app
+        image: "{{ ecr_repo }}:latest"
+        state: started
+        restart_policy: always
+        networks:
+          - name: app-network
+        ports:
+          - "8000:8000"
+        env:
+          DATABASE_URL: postgresql://user:password@postgres-db:5432/transactions

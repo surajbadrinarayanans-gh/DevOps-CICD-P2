@@ -122,6 +122,8 @@ resource "aws_instance" "app" {
   key_name               = "txn-key"
   vpc_security_group_ids = [aws_security_group.private_sg.id]
 
+  iam_instance_profile = aws_iam_instance_profile.ec2_profile.name
+
   tags = {
     Name = "private-app"
   }
@@ -136,9 +138,87 @@ resource "aws_ecr_repository" "app_repo" {
 }
 
 resource "local_file" "ansible_inventory" {
-  content = templatefile("inventory.tftpl", {
+  content = templatefile("${path.module}/../ansible/inventory.tftpl", {
     bastion_ip = aws_instance.bastion.public_ip,
-    app_ip     = aws_instance.app_server.private_ip
+    app_ip     = aws_instance.app.private_ip
   })
-  filename = "../ansible/inventory.ini"
+
+  filename = "${path.module}/../ansible/inventory.ini"
+
+  depends_on = [
+    aws_instance.bastion,
+    aws_instance.app
+  ]
+}
+
+resource "local_file" "ansible_vars" {
+  content = templatefile("${path.module}/../ansible/vars.tftpl", {
+    ecr_url = aws_ecr_repository.app_repo.repository_url
+    region  = var.aws_region
+  })
+
+  filename = "${path.module}/../ansible/group_vars/all.yml"
+
+  depends_on = [
+    aws_ecr_repository.app_repo
+  ]
+}
+
+resource "aws_eip" "nat_eip" {
+  domain = "vpc"
+}
+
+resource "aws_nat_gateway" "nat" {
+  allocation_id = aws_eip.nat_eip.id
+  subnet_id     = aws_subnet.public.id
+
+  tags = {
+    Name = "txn-nat"
+  }
+}
+
+resource "aws_route_table" "private_rt" {
+  vpc_id = aws_vpc.main.id
+
+  tags = {
+    Name = "private-rt"
+  }
+}
+
+resource "aws_route" "private_internet_access" {
+  route_table_id         = aws_route_table.private_rt.id
+  destination_cidr_block = "0.0.0.0/0"
+  nat_gateway_id         = aws_nat_gateway.nat.id
+}
+
+resource "aws_route_table_association" "private_assoc" {
+  subnet_id      = aws_subnet.private.id
+  route_table_id = aws_route_table.private_rt.id
+}
+
+resource "aws_iam_role" "ec2_role" {
+  name = "txn-ec2-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "ec2.amazonaws.com"
+        }
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "ecr_read" {
+  role       = aws_iam_role.ec2_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+}
+
+resource "aws_iam_instance_profile" "ec2_profile" {
+  name = "txn-ec2-profile"
+  role = aws_iam_role.ec2_role.name
 }
