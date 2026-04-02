@@ -10,3 +10,4 @@ terraform/.terraform
 terraform/terraform.tfstate*
 terraform/txn-key.pem
 ansible/inventory.tftpl
+terraform/app.tar
