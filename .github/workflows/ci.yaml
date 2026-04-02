@@ -55,8 +55,8 @@ jobs:
     - name: Build and Tag Image
       run: |
         docker build -t transaction-service .
-        docker tag transaction-service:latest <ECR_URL>:latest
+        docker tag transaction-service:latest 389517403286.dkr.ecr.ap-south-1.amazonaws.com/transaction-service:latest
 
     - name: Push to ECR
       run: |
-        docker push <ECR_URL>:latest
+        docker push 389517403286.dkr.ecr.ap-south-1.amazonaws.com/transaction-service:latest
