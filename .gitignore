@@ -6,3 +6,7 @@ __pycache__/
 *.log
 .DS_Store
 .dockerignore
+terraform/.terraform
+terraform/terraform.tfstate*
+terraform/txn-key.pem
+ansible/inventory.tftpl

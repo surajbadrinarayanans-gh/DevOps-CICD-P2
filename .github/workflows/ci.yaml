@@ -41,3 +41,22 @@ jobs:
 
     - name: Scan Docker Image (Trivy)
       run: trivy image transaction-service
+
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ secrets.AWS_REGION }}
+
+    - name: Login to ECR
+      uses: aws-actions/amazon-ecr-login@v1
+
+    - name: Build and Tag Image
+      run: |
+        docker build -t transaction-service .
+        docker tag transaction-service:latest <ECR_URL>:latest
+
+    - name: Push to ECR
+      run: |
+        docker push <ECR_URL>:latest
